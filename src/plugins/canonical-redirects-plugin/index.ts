@@ -19,6 +19,7 @@ import {
     loadRedirects,
     validateNoCycles,
     validateRedirects,
+    validateTargetsExist,
     type RedirectMap,
 } from "./lib/redirects.js";
 import { rewriteHtml } from "./lib/rewrite.js";
@@ -138,12 +139,15 @@ const canonicalRedirectsPlugin = function canonicalRedirectsPlugin(
             }
 
             const rules = loadRedirects(options.redirectsPath);
-            // Structural validation first, then cycle detection on the
-            // structurally-sound rule set. Cycles are a build-time error
-            // because the edge handler trusts this pre-gate and doesn't
-            // carry its own cycle guard.
+            // Structural validation first, then cycle detection + target-
+            // existence on the structurally-sound rule set. Cycles and dead
+            // targets are build-time errors because the edge handler trusts
+            // this pre-gate and doesn't carry its own guards.
             const structuralErrors = validateRedirects(rules);
-            const errors = structuralErrors.length > 0 ? structuralErrors : validateNoCycles(rules);
+            const errors =
+                structuralErrors.length > 0
+                    ? structuralErrors
+                    : [...validateNoCycles(rules), ...validateTargetsExist(rules, context.siteDir)];
             if (errors.length > 0) {
                 const rendered = errors
                     .map((e) => `  [${e.index}] ${e.key ? `'${e.key}' — ` : ""}${e.message}`)
@@ -174,6 +178,7 @@ const canonicalRedirectsPlugin = function canonicalRedirectsPlugin(
             let rewritten = 0;
             let chainsResolved = 0;
             let missingCanonicalCount = 0;
+            let noindexInjectedCount = 0;
 
             walk(outDir, (filePath) => {
                 if (!filePath.endsWith(".html")) return;
@@ -200,6 +205,7 @@ const canonicalRedirectsPlugin = function canonicalRedirectsPlugin(
                     rewritten++;
                 }
                 if (result.chainResolved) chainsResolved++;
+                if (result.noindexInjected) noindexInjectedCount++;
 
                 if (result.newCanonical) {
                     records.push({
@@ -227,7 +233,7 @@ const canonicalRedirectsPlugin = function canonicalRedirectsPlugin(
             });
 
             log.info(
-                `scanned ${scanned} versioned HTML file(s), rewrote ${rewritten}, chains resolved ${chainsResolved}, missing canonicals ${missingCanonicalCount}`
+                `scanned ${scanned} versioned HTML file(s), rewrote ${rewritten}, chains resolved ${chainsResolved}, missing canonicals ${missingCanonicalCount}, noindex injected ${noindexInjectedCount}`
             );
 
             if (issues.length > 0) {
@@ -235,10 +241,18 @@ const canonicalRedirectsPlugin = function canonicalRedirectsPlugin(
                 const shown = issues.slice(0, maxShow);
                 const header = `canonical-redirects-plugin: ${issues.length} invalid canonical${issues.length === 1 ? "" : "s"} detected`;
                 const body = shown
-                    .map(
-                        (i) =>
-                            `  - ${i.file}\n      canonical: ${i.canonical}\n      reason: ${i.reason}`
-                    )
+                    .map((i) => {
+                        const base =
+                            `  - ${i.file}\n      canonical: ${i.canonical}\n      reason: ${i.reason}`;
+                        if (!i.fix) return base;
+                        // Indent the fix block two extra spaces under the issue bullet
+                        // so it reads as a sub-block in the terminal.
+                        const indentedFix = i.fix
+                            .split("\n")
+                            .map((l) => `      ${l}`)
+                            .join("\n");
+                        return `${base}\n      fix:\n${indentedFix}`;
+                    })
                     .join("\n");
                 const tail =
                     issues.length > maxShow

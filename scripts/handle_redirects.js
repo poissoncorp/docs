@@ -108,6 +108,14 @@ async function handler(event) {
     // loadContent). The KVS only ever contains pre-validated data, so the
     // edge can trust those invariants and keep this loop minimal. See the
     // plugin's validateNoCycles for the authoritative cycle check.
+    //
+    // minimumVersion is required by validation on every versioned (docs)
+    // rule and forbidden on versionless (/guides, /cloud) rules. The
+    // /guides and /cloud branches above short-circuit before this loop,
+    // so in practice every rule this loop sees carries a minimumVersion.
+    // The `rule.minimumVersion &&` guard stays as a cheap belt-and-braces:
+    // if a versionless rule ever reaches here, "absent" is treated as
+    // "always apply", matching the schema intent.
     let current = versionlessUri;
     while (true) {
         let rule;
@@ -116,8 +124,6 @@ async function handler(event) {
         } catch (_) {
             break; // no rule → terminal
         }
-        // Match the plugin's resolveChain: an unset minimumVersion means
-        // the rule applies unconditionally; otherwise gate by version.
         if (rule.minimumVersion && compareVersions(version, rule.minimumVersion) < 0) break;
         current = rule.targetUrl;
     }
