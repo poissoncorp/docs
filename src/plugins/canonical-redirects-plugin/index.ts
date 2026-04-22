@@ -60,8 +60,7 @@ function resolveOptions(opts: CanonicalRedirectsPluginOptions | undefined, siteD
 
     return {
         redirectsPath,
-        failOnInvalidCanonical:
-            userOpts.failOnInvalidCanonical ?? process.env.DOCUSAURUS_STRICT_CANONICALS === "true",
+        failOnInvalidCanonical: userOpts.failOnInvalidCanonical ?? process.env.DOCUSAURUS_STRICT_CANONICALS === "true",
         logLevel: userOpts.logLevel ?? "info",
     };
 }
@@ -133,9 +132,7 @@ const canonicalRedirectsPlugin = function canonicalRedirectsPlugin(
 
         async loadContent() {
             if (!fs.existsSync(options.redirectsPath)) {
-                throw new Error(
-                    `canonical-redirects-plugin: redirects file not found at ${options.redirectsPath}`
-                );
+                throw new Error(`canonical-redirects-plugin: redirects file not found at ${options.redirectsPath}`);
             }
 
             const rules = loadRedirects(options.redirectsPath);
@@ -152,9 +149,7 @@ const canonicalRedirectsPlugin = function canonicalRedirectsPlugin(
                 const rendered = errors
                     .map((e) => `  [${e.index}] ${e.key ? `'${e.key}' — ` : ""}${e.message}`)
                     .join("\n");
-                throw new Error(
-                    `canonical-redirects-plugin: redirects.json failed validation:\n${rendered}`
-                );
+                throw new Error(`canonical-redirects-plugin: redirects.json failed validation:\n${rendered}`);
             }
 
             log.info(`loaded ${rules.length} redirect rule(s) from ${options.redirectsPath}`);
@@ -242,8 +237,7 @@ const canonicalRedirectsPlugin = function canonicalRedirectsPlugin(
                 const header = `canonical-redirects-plugin: ${issues.length} invalid canonical${issues.length === 1 ? "" : "s"} detected`;
                 const body = shown
                     .map((i) => {
-                        const base =
-                            `  - ${i.file}\n      canonical: ${i.canonical}\n      reason: ${i.reason}`;
+                        const base = `  - ${i.file}\n      canonical: ${i.canonical}\n      reason: ${i.reason}`;
                         if (!i.fix) return base;
                         // Indent the fix block two extra spaces under the issue bullet
                         // so it reads as a sub-block in the terminal.
@@ -254,10 +248,7 @@ const canonicalRedirectsPlugin = function canonicalRedirectsPlugin(
                         return `${base}\n      fix:\n${indentedFix}`;
                     })
                     .join("\n");
-                const tail =
-                    issues.length > maxShow
-                        ? `\n  … and ${issues.length - maxShow} more`
-                        : "";
+                const tail = issues.length > maxShow ? `\n  … and ${issues.length - maxShow} more` : "";
                 const message = `${header}\n${body}${tail}`;
 
                 if (options.failOnInvalidCanonical) {
